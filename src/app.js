@@ -21,4 +21,9 @@ app.use(express.urlencoded({extended:true,limit:"16kb"}))
 //4.use saved files in public folder(public folder :used to temporarily save the data) 
 app.use(express.static("public"))
 app.use(cookieParser())
+
+//routes :
+import  userRouter  from "./routes/user.route.js";
+app.use("/api/v1/user",userRouter);
+
 export default app;
