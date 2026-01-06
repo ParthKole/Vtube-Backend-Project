@@ -16,9 +16,11 @@ const userRegister= asyncHandler(async(req,res)=>{
       7.check for user creation 
       8.return the responce
     */
+
+      
    //step 1 :
     const {fullName,email,username,password}=req.body;
-    console.log(req.body);    
+      
     //step 2 :
     if(
         [fullName,email,username,password].some((field)=>
@@ -28,8 +30,9 @@ const userRegister= asyncHandler(async(req,res)=>{
         throw new ApiError(400,"All Fields are Required !")
     }
 
+
     //step 3 :
-        const existedUser=User.findOne(
+        const existedUser=await User.findOne(
             {
                 $or:[{username},{email}]
             }
@@ -39,11 +42,17 @@ const userRegister= asyncHandler(async(req,res)=>{
             throw new ApiError(409,"User Already Exists !")
         }
 
-        const avatarLocalPath=req.files?.avatar[0]?.path;
-        const coverImageLocalPath=req.files?.coverImage[0]?.path;
+    //step 4:check for images and avatar
+        const avatarLocalPath= req.files?.avatar[0]?.path;
+        // const coverImageLocalPath= req.files?.coverImage[0]?.path;
+
+        let coverImageLocalPath;
+        if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length>0){
+            coverImageLocalPath=req.files.coverImage[0].path
+        }
 
         if(!avatarLocalPath){
-            throw new ApiError(400,"Avatar Required !")
+            throw new ApiError(401,"Avatar Required !")
         }
 
        
@@ -54,8 +63,8 @@ const userRegister= asyncHandler(async(req,res)=>{
         if(!avatar){
             throw new ApiError(400,"Avatar Required !")
         }
-
-        const user=User.create({
+    //step 5:create a user object 
+        const user=await User.create({
             fullName,
             avatar:avatar.url,
             coverImage:coverImage?.url||"",
@@ -64,16 +73,18 @@ const userRegister= asyncHandler(async(req,res)=>{
             username:username.toLowerCase()
         })
         
-        const createdUser=await user.findById(user._id).select(
+    //step 6: remove password and refresh token from the responce 
+        const createdUser=await User.findById(user._id).select(
             "-password -refreshToken"
         )
 
+    //step 7:check for user creation
         if(!createdUser){
             throw new ApiError(500,"Something Wrong while registering the User ! ")
         }
-
+    //step 8:return the responce
         return res.status(201).json(
-            new ApiResponse(200,"User Registered Successfully")
+            new ApiResponse(200,createdUser,"User Registered Successfully")
         )
 })
 
