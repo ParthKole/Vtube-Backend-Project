@@ -210,4 +210,49 @@ const refreshAccessToken=asyncHandler(async(req,res)=>{
     
 })
 
-export {userRegister,userLogin,userLogout,refreshAccessToken} ;
+const changeCurrentPassword =asyncHandler(async(req,res)=>{
+    const {oldPassword,newPassword}=req.body;
+
+    
+    const user=await user.findById(req.user?._id);
+    const isPasswordCorrect=await user.isPasswordCorrect(oldPassword)
+    
+    if(!isPasswordCorrect){
+        throw new ApiError(400,"Invalid Password !")
+    }
+
+    user.password=password;
+    user.save({validateBeforeSave:false});
+    return res;
+})
+
+const getCurrentUser=asyncHandler(async(req,res)=>{
+    return res.status(200)
+    .json(new ApiResponse(200,req.user,"current user fetched successfully"))
+})
+
+const updateAccountDetails=asyncHandler(async(req,res)=>{
+    const {fullName,email}=req.body;
+
+    if(!fullName||!email){
+        throw new ApiError(400,"Fullname or email is invalid!")
+    }
+
+    const user =await User.findByIdAndUpdate(req.user?._id,
+        {
+            $set:{
+                fullName,
+                email:email
+            }
+        }
+        ,{new:true}
+    ).select("-password")
+
+    return res.status(200)
+    .json(new ApiResponse(200,user,"Account Details updated Successfully !"))
+
+})
+
+
+
+export {userRegister,userLogin,userLogout,refreshAccessToken,changeCurrentPassword,getCurrentUser,updateAccountDetails} ;
