@@ -3,6 +3,7 @@ import {ApiError} from "../utils/ApiError.js"
 import {User} from "../models/user.model.js"
 import {uploadOnCloudinary} from "../utils/Cloudinary.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
+import  mongoose  from "mongoose";
 import jwt from "jsonwebtoken"
 
 const userRegister= asyncHandler(async(req,res)=>{
@@ -152,8 +153,8 @@ const userLogout=asyncHandler(async(req,res)=>{
     await User.findOneAndUpdate(
         req.user._id,
         {
-            $set:{
-                refreshToken:undefined
+            $unset:{
+                refreshToken:1
             }
         },
         {
@@ -310,7 +311,7 @@ const getUserChannelProfile=asyncHandler(async(req,res)=>{
     const channel=await User.aggregate([
         {
             $match:{
-                username:username?.toLowerCase()
+                username:username.toLowerCase()
             }
         },
         {
@@ -332,14 +333,15 @@ const getUserChannelProfile=asyncHandler(async(req,res)=>{
         {
             $addFields:{
                 subscribersCount:{
-                    $size:"subscribers"
+                    $size:"$subscribers"
                 },
                 channelsSubscribedToCount:{
-                    $size:"subscribedTo"
+                    $size:"$subscribedTo"
                 },
                 isSubscribed:{
                     $cond:{
-                        if:{$in :[req.user?._id,"subcribers.subscriber"]},
+                        if:{$in : [new mongoose.Types.ObjectId(req.user._id),
+                                "$subscribers.subscriber"]},
                         then:true,
                         else:false
 
@@ -374,7 +376,7 @@ const getWatchHistory=asyncHandler(async(req,res)=>{
     const user=await User.aggregate([
         {
             $match:{
-                _id:new mongoose.Types.objectId(req.user._id)
+                _id:new mongoose.Types.ObjectId(req.user._id)
             }
         },
         {
@@ -392,7 +394,7 @@ const getWatchHistory=asyncHandler(async(req,res)=>{
                             as:"owner",
                             pipeline:[
                                 {
-                                    project:{
+                                    $project:{
                                         fullname:1,
                                         username:1,
                                         avatar:1
