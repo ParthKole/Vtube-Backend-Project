@@ -1,6 +1,6 @@
 import { asyncHandler } from "../utils/asyncHandler.js"
 import {ApiError} from "../utils/ApiError.js"
-import {User, User} from "../models/user.model.js"
+import {User} from "../models/user.model.js"
 import {uploadOnCloudinary} from "../utils/Cloudinary.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
@@ -302,6 +302,125 @@ const updateUserCoverImage=asyncHandler(async(req,res)=>{
     .json(new ApiResponse(200,user,"coverImage Updated Successfully !"))
 })
 
+const getUserChannel=asyncHandler(async(req,res)=>{
+    const {username}=req.params;
+    if(!username){
+        throw new ApiError(400,"Username missing !");
+    }
+    const channel=await User.aggregate([
+        {
+            $match:{
+                username:username?.toLowerCase()
+            }
+        },
+        {
+            $lookup:{
+                from:"subscriptions",
+                localField:"_id",
+                foreignField:"channel",
+                as:"subscribers"
+            }
+        },
+        {
+            $lookup:{
+                from:"subscriptions",
+                localField:"_id",
+                foreignField:"subscriber",
+                as:"subscribedTo"
+            }
+        },
+        {
+            $addFields:{
+                subscribersCount:{
+                    $size:"subscribers"
+                },
+                channelsSubscribedToCount:{
+                    $size:"subscribedTo"
+                },
+                isSubscribed:{
+                    $cond:{
+                        if:{$in :[req.user?._id,"subcribers.subscriber"]},
+                        then:true,
+                        else:false
+
+                    }
+
+                }
+            }
+        },
+        {
+            $project:{
+                fullname:1,
+                username:1,
+                subscribersCount:1,
+                channelsSubscribedToCount:1,
+                coverImage:1,
+                avatar:1,
+                isSubscribed:1,
+                email:1
+            }
+        }
+    ])
+
+    if(!channel?.length){
+        throw new ApiError(400,"channel does not exists");
+    }
+
+    res.status(200)
+    .json(new ApiResponse(200,channel[0],"User Channel Fetched successfully !"))
+});
+
+const getWatchHistory=asyncHandler(async(req,res)=>{
+    const user=await User.aggregate([
+        {
+            $match:{
+                _id:new mongoose.Types.objectId(req.user._id)
+            }
+        },
+        {
+            $lookup:{
+                from:"videos",
+                localField:"watchHistory",
+                foreignField:"_id",
+                as:"watchHistory",
+                pipeline:[
+                    {
+                        $lookup:{
+                            from:"users",
+                            localField:"owner",
+                            foreignField:"_id",
+                            as:"owner",
+                            pipeline:[
+                                {
+                                    project:{
+                                        fullname:1,
+                                        username:1,
+                                        avatar:1
+                                    }
+
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        $addFields:{
+                            owner:{
+                                $first:"$owner"
+                            }
+                        }
+                    }
+                    
+                ]
+            }
+        },
+        
+    ])
+    res.status(200)
+    .json(new ApiResponse(200,user[0].watchHistory,"Watch History fetched successfully !"))
+})
+
+
+
 export {
     userRegister,
     userLogin,
@@ -311,4 +430,6 @@ export {
     getCurrentUser,
     updateAccountDetails,
     updateUserAvatar,
-    updateUserCoverImage} ;
+    updateUserCoverImage,
+    getUserChannel,
+    getWatchHistory} ;
