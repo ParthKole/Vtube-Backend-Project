@@ -97,10 +97,42 @@ const publishAVideo = asyncHandler(async (req, res) => {
 const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: get video by id
+    if (!mongoose.Types.ObjectId.isValid(videoId)) {
+     throw new ApiError(400, "Invalid video id");
+    }
+
+  // Increment views + fetch updated video
+    const video = await Video.findByIdAndUpdate(
+      videoId,
+      { $inc: { views: 1 } },
+      { new: true }
+    ).populate("owner", "username avatar fullName");
+
+    if (!video) {
+      throw new ApiError(404, "Video not found");
+    }
+
+    if (!video.isPublished) {
+      throw new ApiError(403, "Video is not published yet");
+    }
+
+    // Update watch history (non-blocking)
+     if (req.user?._id) {
+      User.findByIdAndUpdate(
+        req.user._id,
+        { $addToSet: { watchHistory: videoId } }
+      ).catch(() => {});
+    }
+
+    res
+      .status(200)
+      .json(new ApiResponse(200, video, "Video fetched successfully"));
 })
+
 
 const updateVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
+
     //TODO: update video details like title, description, thumbnail
 
 })
