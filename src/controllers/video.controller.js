@@ -4,7 +4,7 @@ import {User} from "../models/user.model.js"
 import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
-import {uploadOnCloudinary} from "../utils/Cloudinary.js"
+import {deleteFromCloudinary, uploadOnCloudinary} from "../utils/Cloudinary.js"
 
 
 const getAllVideos = asyncHandler(async (req, res) => {
@@ -82,8 +82,14 @@ const publishAVideo = asyncHandler(async (req, res) => {
     const video=await Video.create({
         title,
         description,
-        videoFile:videoUpload.secure_url,
-        thumbnail:thumbnailUpload.secure_url,
+        videoFile:{
+            url:videoUpload.secure_url,
+            public_id:videoUpload.public_id
+        },
+        thumbnail:{
+            url:thumbnailUpload.secure_url,
+            public_id:thumbnailUpload.public_id
+        },
         duration:videoUpload.duration||0,
         owner:req.user._id,
         isPublished:true
@@ -130,20 +136,110 @@ const getVideoById = asyncHandler(async (req, res) => {
 })
 
 
+
 const updateVideo = asyncHandler(async (req, res) => {
-    const { videoId } = req.params
+  const { videoId } = req.params;
+  const { title, description } = req.body;
+  const userId = req.user._id;
 
-    //TODO: update video details like title, description, thumbnail
+  const thumbnailLocalPath = req.files?.thumbnail?.[0]?.path;
 
-})
+  if (!mongoose.Types.ObjectId.isValid(videoId)) {
+    throw new ApiError(400, "Invalid video id");
+  }
+
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  if (video.owner.toString() !== userId.toString()) {
+    throw new ApiError(403, "You are not authorized to update this video");
+  }
+
+  if (!title && !description && !thumbnailLocalPath) {
+    throw new ApiError(400, "Nothing to update");
+  }
+
+  if (title) video.title = title;
+  if (description) video.description = description;
+
+  if (thumbnailLocalPath) {
+    //  Upload new thumbnail
+    const thumbnailUpload = await uploadOnCloudinary(thumbnailLocalPath);
+    if (!thumbnailUpload) {
+      throw new ApiError(500, "Thumbnail upload failed");
+    }
+
+    //  Delete old thumbnail (safe)
+    deleteFromCloudinary(video.thumbnail?.public_id);
+
+    
+    video.thumbnail = {
+      url: thumbnailUpload.secure_url,
+      public_id: thumbnailUpload.public_id
+    };
+  }
+
+  const updatedVideo = await video.save({ validateBeforeSave: false });
+
+  res.status(200).json(
+    new ApiResponse(200, updatedVideo, "Video updated successfully")
+  );
+});
+
+
 
 const deleteVideo = asyncHandler(async (req, res) => {
-    const { videoId } = req.params
-    //TODO: delete video
-})
+  const { videoId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(videoId)) {
+    throw new ApiError(400, "Invalid video id");
+  }
+
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  if (video.owner.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "You are not authorized to delete this video");
+  }
+
+  // Delete assets from Cloudinary 
+  deleteFromCloudinary(video.videoFile?.public_id);
+  deleteFromCloudinary(video.thumbnail?.public_id);
+
+  // Delete video document
+  await Video.findByIdAndDelete(videoId);
+
+  res.status(200).json(
+    new ApiResponse(200, { deleted: true }, "Video deleted successfully")
+  );
+});
+
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
     const { videoId } = req.params
+    const userId=req.user._id;
+
+    if(!mongoose.Types.ObjectId.isValid(videoId)){
+        throw new ApiError(400,"Invalid video id");
+    }
+
+    const video=await Video.findById(videoId);
+    if(!video){
+        throw new ApiError(404,"Video not found");
+    }
+
+    if(video.owner.toString()!==userId.toString()){
+        throw new ApiError(403,"You are not authorized to update this video");
+    }
+
+    video.isPublished=!video.isPublished;
+    await video.save({validateBeforeSave:false});
+
+    res.status(200).json(new ApiResponse(200,video,"video publish status updated successfully"));
 })
 
 export {

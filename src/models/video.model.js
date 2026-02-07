@@ -5,12 +5,24 @@ const Schema=mongoose.Schema;
 const videoSchema=new Schema({
     
     videoFile :{
-        type : String, //cludinary url
-        required :true
+        url:{
+            type : String, //cludinary url
+            required :true
+        },
+        public_id:{
+            type:String,
+            required:true
+        }
     },
     thumbnail:{
-        type : String, //cludinary url
-        required :true
+         url:{
+            type : String, //cludinary url
+            required :true
+        },
+        public_id:{
+            type:String,
+            required:true
+        }
     },
     title:{
          type : String, 
