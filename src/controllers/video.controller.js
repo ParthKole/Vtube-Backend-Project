@@ -207,8 +207,8 @@ const deleteVideo = asyncHandler(async (req, res) => {
   }
 
   // Delete assets from Cloudinary 
-  deleteFromCloudinary(video.videoFile?.public_id);
-  deleteFromCloudinary(video.thumbnail?.public_id);
+  await deleteFromCloudinary(video.videoFile?.public_id,"video");
+  await deleteFromCloudinary(video.thumbnail?.public_id,"image");
 
   // Delete video document
   await Video.findByIdAndDelete(videoId);
