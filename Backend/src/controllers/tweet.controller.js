@@ -80,30 +80,66 @@ const updateTweet = asyncHandler(async (req, res) => {
 })
 
 const deleteTweet = asyncHandler(async (req, res) => {
-    //TODO: delete tweet
-    const {tweetId} = req.params;
-    if(!isValidObjectId(tweetId)){
-        throw new ApiError(400,"Invalid tweet ID");
-    }
-    const userId=req.user._id;
-    
+    const { tweetId } = req.params;
 
-    const tweet=await Tweet.find({_id:tweetId});
-    if(!tweet){
-        throw new ApiError(404,"Tweet not found");
-    }
-    if(tweet.owner.toString()!==userId.toString()){
-        throw new ApiError(403,"You are not authorized to delete this tweet");
+    if (!isValidObjectId(tweetId)) {
+        throw new ApiError(400, "Invalid tweet ID");
     }
 
+    if (!req.user) {
+        throw new ApiError(401, "Unauthorized");
+    }
+    const userId = req.user._id;
+    const tweet = await Tweet.findById(tweetId); 
+    if (!tweet) {
+        throw new ApiError(404, "Tweet not found");
+    }
+    if (tweet.owner.toString() !== userId.toString()) {
+        throw new ApiError(403, "You are not authorized to delete this tweet");
+    }
     await tweet.deleteOne();
+    res.status(200).json(
+        new ApiResponse(200, null, "Tweet deleted successfully")
+    );
+});
 
-    res.status(200).json(new ApiResponse(200,null,"Tweet deleted successfully"));
-})
+const getAllTweets = asyncHandler(async (req, res) => {
+    let { page = 1, limit = 10 } = req.query;
+
+    // Convert to numbers safely
+    const pageNumber = Math.max(1, parseInt(page) || 1);
+    const limitNumber = Math.max(1, parseInt(limit) || 10);
+
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // Fetch tweets with pagination
+    const tweets = await Tweet.find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNumber)
+        .populate("owner", "fullname username email avatar");
+
+    // Get total tweet count
+    const totalTweets = await Tweet.countDocuments();
+
+    res.status(200).json(
+        new ApiResponse(
+            200,
+            {
+                tweets,
+                totalTweets,
+                totalPages: Math.ceil(totalTweets / limitNumber),
+                currentPage: pageNumber
+            },
+            "All tweets retrieved successfully"
+        )
+    );
+});
 
 export {
     createTweet,
     getUserTweets,
     updateTweet,
-    deleteTweet
+    deleteTweet,
+    getAllTweets
 }

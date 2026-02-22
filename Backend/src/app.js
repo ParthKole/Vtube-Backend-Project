@@ -8,7 +8,7 @@ const app=express();
 
 //1.if cross origin request occurs then allow only these devices (means cors_origin)
 app.use(cors({
-    origin:process.env.CORS_ORIGIN,
+    origin:"http://localhost:5173",
     credentials:true
 }))
 
