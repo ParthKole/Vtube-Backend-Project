@@ -340,7 +340,7 @@ const getUserChannelProfile=asyncHandler(async(req,res)=>{
                 },
                 isSubscribed:{
                     $cond:{
-                        if:{$in : [new mongoose.Types.ObjectId(req.user._id),
+                        if:{$in : [new mongoose.Types.ObjectId(req.user?._id),
                                 "$subscribers.subscriber"]},
                         then:true,
                         else:false
