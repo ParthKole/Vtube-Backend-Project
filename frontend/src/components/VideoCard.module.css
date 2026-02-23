@@ -72,6 +72,15 @@
   flex-shrink: 0;
 }
 
+.avatarPlaceholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
 .title {
   font-size: 0.95rem;
   font-weight: 600;

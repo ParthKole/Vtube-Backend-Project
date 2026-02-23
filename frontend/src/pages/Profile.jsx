@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { authApi, videoApi } from '../api/index.js';
+import { authApi, likeApi, subscriptionApi, videoApi } from '../api/index.js';
 import { VideoCard } from '../components/VideoCard.jsx';
 import { EditVideoModal } from '../components/EditVideoModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -16,6 +16,9 @@ export function Profile() {
   const { user, isAuthenticated, refreshUser } = useAuth();
   const [channel, setChannel] = useState(null);
   const [videos, setVideos] = useState([]);
+  const [watchHistory, setWatchHistory] = useState([]);
+  const [likedVideos, setLikedVideos] = useState([]);
+  const [privateError, setPrivateError] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showEdit, setShowEdit] = useState(false);
@@ -55,11 +58,48 @@ export function Profile() {
   }, [username]);
 
   useEffect(() => {
+    if (!isOwnProfile || !isAuthenticated) {
+      setWatchHistory([]);
+      setLikedVideos([]);
+      setPrivateError('');
+      return;
+    }
+    setPrivateError('');
+    Promise.all([authApi.getWatchHistory(), likeApi.getLikedVideos()])
+      .then(([historyRes, likedRes]) => {
+        const h = historyRes?.data ?? historyRes;
+        const l = likedRes?.data ?? likedRes;
+        setWatchHistory(Array.isArray(h) ? h : []);
+        setLikedVideos(Array.isArray(l) ? l : []);
+      })
+      .catch((err) => setPrivateError(err.response?.data?.message ?? 'Failed to load private data'));
+  }, [isOwnProfile, isAuthenticated, channel?._id]);
+
+  useEffect(() => {
     if (showEdit && channel) {
       setEditFullName(channel.fullName ?? channel.fullname ?? '');
       setEditEmail(channel.email ?? '');
     }
   }, [showEdit, channel]);
+
+  const handleSubscribe = async () => {
+    if (!isAuthenticated || isOwnProfile || !channel?._id) return;
+    try {
+      const res = await subscriptionApi.toggle(channel._id);
+      const d = res?.data ?? res; // { isSubscribed }
+      setChannel((prev) => {
+        const prevCount = Number(prev?.subscribersCount ?? 0) || 0;
+        const nextSubscribed = !!d?.isSubscribed;
+        const prevSubscribed = !!prev?.isSubscribed;
+        const delta = nextSubscribed === prevSubscribed ? 0 : nextSubscribed ? 1 : -1;
+        return {
+          ...(prev ?? {}),
+          isSubscribed: nextSubscribed,
+          subscribersCount: Math.max(0, prevCount + delta),
+        };
+      });
+    } catch {}
+  };
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
@@ -102,6 +142,9 @@ export function Profile() {
   if (error) return <div className="page-error">{error}</div>;
   if (!channel) return null;
 
+  const isSubscribed = !!channel?.isSubscribed;
+  const subscribersCount = Number(channel?.subscribersCount ?? 0) || 0;
+
   return (
     <div className="profile-page">
       <div className="profile-header" style={{ backgroundImage: channel.coverImage ? `url(${channel.coverImage})` : undefined }}>
@@ -111,11 +154,19 @@ export function Profile() {
           <div>
             <h1>{channel.fullname ?? channel.fullName ?? channel.username}</h1>
             <p>@{channel.username}</p>
-            <p>{channel.subscribersCount ?? 0} subscribers</p>
+            <p>{subscribersCount} subscribers</p>
             {isOwnProfile && (
               <button onClick={() => setShowEdit(!showEdit)} className="btn-edit-profile">
                 {showEdit ? 'Cancel' : 'Edit Profile'}
               </button>
+            )}
+            {!isOwnProfile && isAuthenticated && (
+              <div className="subscribe-wrap" style={{ marginTop: '0.75rem' }}>
+                <button onClick={handleSubscribe} className={`btn-subscribe ${isSubscribed ? 'subscribed' : ''}`}>
+                  {isSubscribed ? 'Subscribed' : 'Subscribe'}
+                </button>
+                <span className="btn-count">{subscribersCount}</span>
+              </div>
             )}
           </div>
         </div>
@@ -173,6 +224,28 @@ export function Profile() {
         ))}
       </div>
       {videos.length === 0 && <p>No videos yet.</p>}
+
+      {isOwnProfile && (
+        <>
+          <h2 style={{ marginTop: '2rem' }}>Watch History</h2>
+          {privateError && <div className="form-error">{privateError}</div>}
+          <div className="video-grid">
+            {watchHistory.map((v) => (
+              <VideoCard key={v._id} video={v} />
+            ))}
+          </div>
+          {watchHistory.length === 0 && <p>No watch history yet.</p>}
+
+          <h2 style={{ marginTop: '2rem' }}>Liked Videos</h2>
+          <div className="video-grid">
+            {likedVideos.map((v) => (
+              <VideoCard key={v._id} video={v} />
+            ))}
+          </div>
+          {likedVideos.length === 0 && <p>No liked videos yet.</p>}
+        </>
+      )}
+
       {editVideo && (
         <EditVideoModal video={editVideo} onClose={() => setEditVideo(null)} onSaved={loadProfile} />
       )}

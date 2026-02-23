@@ -54,6 +54,13 @@ export const authApi = {
     axiosInstance.get(`${AUTH_BASE}/c/${username}`).then((res) => res.data),
 
   /**
+   * GET /user/history (private)
+   * Returns watch history videos (with owner populated).
+   */
+  getWatchHistory: () =>
+    axiosInstance.get(`${AUTH_BASE}/history`).then((res) => res.data),
+
+  /**
    * PATCH /user/update-account (private)
    * Body: { fullName, email }
    */

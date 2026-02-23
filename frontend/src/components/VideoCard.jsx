@@ -20,10 +20,14 @@ export function VideoCard({ video, showEdit = false, onEdit }) {
           <span className={styles.duration}>{formatDuration(v?.duration)}</span>
         </div>
         <div className={styles.info}>
-          <img src={owner?.avatar} alt="" className={styles.avatar} />
+          {owner?.avatar ? (
+            <img src={owner.avatar} alt="" className={styles.avatar} />
+          ) : (
+            <div className={styles.avatarPlaceholder} aria-hidden="true" />
+          )}
           <div>
             <h3 className={styles.title}>{v?.title}</h3>
-            <p className={styles.channel}>{owner?.username ?? owner?.fullName}</p>
+            <p className={styles.channel}>{owner?.username ?? owner?.fullName ?? 'Unknown'}</p>
             <p className={styles.meta}>{v?.views ?? 0} views</p>
           </div>
         </div>

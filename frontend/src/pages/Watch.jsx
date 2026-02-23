@@ -9,19 +9,22 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { videoApi, commentApi, likeApi, subscriptionApi } from '../api/index.js';
+import { authApi, videoApi, commentApi, likeApi, subscriptionApi } from '../api/index.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export function Watch() {
   const { videoId } = useParams();
   const { user, isAuthenticated } = useAuth();
   const [video, setVideo] = useState(null);
+  const [channelProfile, setChannelProfile] = useState(null);
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [likedVideoIds, setLikedVideoIds] = useState([]);
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editContent, setEditContent] = useState('');
   const [newlyAddedId, setNewlyAddedId] = useState(null);
@@ -58,26 +61,79 @@ export function Watch() {
         const v = videoRes?.data ?? videoRes;
         const c = commentRes?.data ?? commentRes;
         setVideo(v);
+        setLikeCount(
+          Number(v?.likesCount ?? v?.likeCount ?? v?.likes ?? 0) || 0
+        );
         setComments(Array.isArray(c) ? c : []);
       })
       .catch((err) => setError(err.response?.data?.message ?? 'Failed to load'))
       .finally(() => setLoading(false));
   }, [videoId]);
 
+  useEffect(() => {
+    if (!video?.owner?.username) return;
+    authApi
+      .getChannelProfile(video.owner.username)
+      .then((res) => setChannelProfile(res?.data ?? res))
+      .catch(() => setChannelProfile(null));
+  }, [video?.owner?.username]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setLiked(false);
+      setLikedVideoIds([]);
+      return;
+    }
+    likeApi
+      .getLikedVideos()
+      .then((res) => {
+        const arr = res?.data ?? res;
+        const ids = Array.isArray(arr) ? arr.map((v) => v?._id).filter(Boolean) : [];
+        setLikedVideoIds(ids);
+      })
+      .catch(() => setLikedVideoIds([]));
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    setLiked(likedVideoIds.includes(videoId));
+  }, [likedVideoIds, videoId, isAuthenticated]);
+
   const handleLike = async () => {
     if (!isAuthenticated) return;
     try {
       const res = await likeApi.toggleVideo(videoId);
       const d = res?.data ?? res;
-      setLiked(d?.liked ?? !liked);
+      const nextLiked = d?.liked ?? !liked;
+      setLiked((prev) => {
+        const delta = nextLiked === prev ? 0 : nextLiked ? 1 : -1;
+        if (delta !== 0) setLikeCount((c) => Math.max(0, (Number(c) || 0) + delta));
+        return nextLiked;
+      });
+      setLikedVideoIds((prev) => {
+        if (!Array.isArray(prev)) return prev;
+        if (nextLiked) return prev.includes(videoId) ? prev : [videoId, ...prev];
+        return prev.filter((id) => id !== videoId);
+      });
     } catch {}
   };
 
   const handleSubscribe = async () => {
     if (!isAuthenticated || !video?.owner?._id) return;
     try {
-      await subscriptionApi.toggle(video.owner._id);
-      loadVideo();
+      const res = await subscriptionApi.toggle(video.owner._id);
+      const d = res?.data ?? res; // { isSubscribed }
+      setChannelProfile((prev) => {
+        const prevCount = Number(prev?.subscribersCount ?? 0) || 0;
+        const nextSubscribed = !!d?.isSubscribed;
+        const prevSubscribed = !!prev?.isSubscribed;
+        const delta = nextSubscribed === prevSubscribed ? 0 : nextSubscribed ? 1 : -1;
+        return {
+          ...(prev ?? {}),
+          isSubscribed: nextSubscribed,
+          subscribersCount: Math.max(0, prevCount + delta),
+        };
+      });
     } catch {}
   };
 
@@ -128,6 +184,8 @@ export function Watch() {
 
   const owner = video.owner;
   const videoUrl = video.videoFile?.url ?? video.videoFile;
+  const isSubscribed = !!channelProfile?.isSubscribed;
+  const subscribersCount = Number(channelProfile?.subscribersCount ?? 0) || 0;
 
   return (
     <div className="watch-page">
@@ -148,14 +206,17 @@ export function Watch() {
               </div>
             </Link>
             {isAuthenticated && user?._id !== owner?._id && (
-              <button onClick={handleSubscribe} className="btn-subscribe">
-                Subscribe
-              </button>
+              <div className="subscribe-wrap">
+                <button onClick={handleSubscribe} className={`btn-subscribe ${isSubscribed ? 'subscribed' : ''}`}>
+                  {isSubscribed ? 'Subscribed' : 'Subscribe'}
+                </button>
+                <span className="btn-count">{subscribersCount}</span>
+              </div>
             )}
           </div>
           {isAuthenticated && (
             <button onClick={handleLike} className={`btn-like ${liked ? 'liked' : ''}`}>
-              {liked ? 'Liked' : 'Like'}
+              {liked ? 'Liked' : 'Like'} <span className="btn-count">{likeCount}</span>
             </button>
           )}
         </div>
