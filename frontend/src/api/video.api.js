@@ -29,10 +29,12 @@ export const videoApi = {
    * POST /videos (private)
    * FormData: title, description, videoFile (file), thumbnail (file)
    * VIDEO UPLOAD - Uses multipart/form-data for file upload to Cloudinary.
+   * Optional config: { onUploadProgress } for progress bar.
    */
-  create: (formData) =>
+  create: (formData, config = {}) =>
     axiosInstance.post(VIDEO_BASE, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      ...config,
     }).then((res) => res.data),
 
   /**

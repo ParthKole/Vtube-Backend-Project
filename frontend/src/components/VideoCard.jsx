@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import styles from './VideoCard.module.css';
 
 export function VideoCard({ video, showEdit = false, onEdit }) {
   const v = video?.data ?? video;
@@ -13,33 +12,45 @@ export function VideoCard({ video, showEdit = false, onEdit }) {
   };
 
   return (
-    <div className={styles.wrapper}>
-      <Link to={`/watch/${v?._id}`} className={styles.card}>
-        <div className={styles.thumb}>
-          <img src={thumb} alt={v?.title} />
-          <span className={styles.duration}>{formatDuration(v?.duration)}</span>
-        </div>
-        <div className={styles.info}>
-          {owner?.avatar ? (
-            <img src={owner.avatar} alt="" className={styles.avatar} />
+    <div className="vcard-edit-wrap">
+      <Link to={`/watch/${v?._id}`} className="vcard">
+        <div className="vcard-thumb">
+          {thumb ? (
+            <img src={thumb} alt={v?.title} />
           ) : (
-            <div className={styles.avatarPlaceholder} aria-hidden="true" />
+            <div className="vcard-thumb-placeholder">🎬</div>
           )}
-          <div>
-            <h3 className={styles.title}>{v?.title}</h3>
-            <p className={styles.channel}>{owner?.username ?? owner?.fullName ?? 'Unknown'}</p>
-            <p className={styles.meta}>{v?.views ?? 0} views</p>
+          <span className="vcard-duration">{formatDuration(v?.duration)}</span>
+          <div className="vcard-play-overlay">
+            <div className="play-btn-big">▶</div>
+          </div>
+        </div>
+        <div className="vcard-info">
+          <div className="vcard-meta-row">
+            {owner?.avatar ? (
+              <img src={owner.avatar} alt="" className="vcard-avatar" />
+            ) : (
+              <div className="vcard-avatar" aria-hidden="true">
+                {(owner?.username?.[0] ?? owner?.fullName?.[0] ?? '?').toUpperCase()}
+              </div>
+            )}
+            <div className="vcard-title-text">{v?.title}</div>
+          </div>
+          <div className="vcard-sub">
+            <span>{owner?.username ?? owner?.fullName ?? 'Unknown'}</span>
+            <span>·</span>
+            <span>{v?.views ?? 0} views</span>
           </div>
         </div>
       </Link>
       {showEdit && onEdit && (
         <button
           type="button"
-          className={styles.editBtn}
+          className="vcard-edit-btn"
           onClick={handleEditClick}
           aria-label="Edit video"
         >
-          Edit
+          ✏️
         </button>
       )}
     </div>

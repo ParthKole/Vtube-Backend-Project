@@ -31,7 +31,7 @@ router.route("/login").post(userLogin);
 router.route("/refresh-token").post(refreshAccessToken);
 
 // public channel profile
-router.route("/c/:username").get(getUserChannelProfile);
+router.route("/c/:username").get(verifyJWT,getUserChannelProfile);
 
 // private routes
 router.route("/logout").post(verifyJWT, userLogout);

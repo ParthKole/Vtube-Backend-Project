@@ -1,6 +1,7 @@
 import mongoose, {isValidObjectId} from "mongoose"
 import {Video} from "../models/video.model.js"
 import {User} from "../models/user.model.js"
+import {Like} from "../models/like.model.js"
 import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
@@ -118,9 +119,29 @@ const getVideoById = asyncHandler(async (req, res) => {
       throw new ApiError(404, "Video not found");
     }
 
+    const totalLikes = await Like.countDocuments({
+    video: videoId
+    });
+
     if (!video.isPublished) {
       throw new ApiError(403, "Video is not published yet");
     }
+    
+  let isLiked = false;    
+
+    if (req.user?._id) {
+    const existingLike = await Like.findOne({
+      video: videoId,
+      likedby: req.user._id
+    });
+
+    isLiked = !!existingLike;
+
+    User.findByIdAndUpdate(
+      req.user._id,
+      { $addToSet: { watchHistory: videoId } }
+    ).catch(() => {});
+  }
 
     // Update watch history (non-blocking)
      if (req.user?._id) {
@@ -130,9 +151,19 @@ const getVideoById = asyncHandler(async (req, res) => {
       ).catch(() => {});
     }
 
-    res
-      .status(200)
-      .json(new ApiResponse(200, video, "Video fetched successfully"));
+res
+  .status(200)
+  .json(
+    new ApiResponse(
+      200,
+      {
+        ...video._doc,     
+        totalLikes,
+        isLiked         
+      },
+      "Video fetched successfully"
+    )
+  );
 })
 
 

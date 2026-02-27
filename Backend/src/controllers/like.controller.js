@@ -138,15 +138,26 @@ const getLikedVideos = asyncHandler(async (req, res) => {
   const likes = await Like.find({
     likedby: userId,
     video: { $ne: null }
-  }).populate("video");
+  }).populate({
+    path: "video",
+    match: { isPublished: true }, // only published videos
+    populate: {
+      path: "owner",
+      select: "username avatar fullName"
+    }
+  });
 
-  // keep only published videos
+  // Extract only valid populated videos
   const likedVideos = likes
-    .filter(like => like.video && like.video.isPublished === true)
-    .map(like => like.video);
+    .map((like) => like.video)
+    .filter(Boolean);
 
   res.status(200).json(
-    new ApiResponse(200, likedVideos, "Liked videos fetched successfully")
+    new ApiResponse(
+      200,
+      likedVideos,
+      "Liked videos fetched successfully"
+    )
   );
 });
 
